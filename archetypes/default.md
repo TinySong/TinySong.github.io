@@ -2,8 +2,8 @@
 title: "{{ replace .TranslationBaseName "-" " " | title }}"
 subtitle: "{{ replace .TranslationBaseName "-" " " | title }}"
 date: {{ .Date }}
-draft: true
 tags: ""
+type: "post"
 categories: ""
 description: ""
 ---
