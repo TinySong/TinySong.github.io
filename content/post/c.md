@@ -1,7 +1,7 @@
 ---
 title: "C"
 subtitle: "C"
-date: 2017-11-30T14:50:25+08:00
+date: 2017-11-30
 draft: true
 tags: "ceshi111"
 categories: "ceshi"
