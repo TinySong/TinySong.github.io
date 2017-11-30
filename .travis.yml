@@ -4,7 +4,7 @@ script:
   - binaries/hugo
 
 deploy:
-  provider: pages
+  provider: blog-source
   skip_cleanup: true
   github_token: $GITHUB_API_KEY
   on:
