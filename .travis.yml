@@ -3,20 +3,21 @@ language: go
 go:
   - "1.7.1"
 
+install: go get -v github.com/gohugoio/hugo
 # S: Build Lifecycle
 script:
   - hugo
 
-after_script:
-  - cd ./public
-  - git init
-  - git config user.name "tinysong"
-  - git config user.email "tinysong1226@gmail.com"
-  - git add .
-  - git commit -m "Update docs"
-  - git push --force --quiet "https://${GH_TOKEN}@${GH_REF}" master:master
-# E: Build LifeCycle
-
+deploy:
+  provider: pages
+  skip_cleanup: true
+  github_token: $GITHUB_API_KEY
+  on:
+    branch: master
+  local_dir: public
+  repo: tinysong/tinysong.github.io
+  target_branch: master
+  name: song
 branches:
   only:
     - blog-source
