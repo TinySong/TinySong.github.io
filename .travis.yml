@@ -8,11 +8,11 @@ deploy:
   skip_cleanup: true
   github_token: $GITHUB_API_KEY
   on:
-    branch: master
+    branch: blog-source
   local_dir: public
   repo: tinysong/tinysong.github.io
   target_branch: master
-  name: song
+  name: tinysong
 branches:
   only:
     - blog-source
