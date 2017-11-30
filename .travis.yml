@@ -1,3 +1,4 @@
+language: shell
 # install: go get -v github.com/gohugoio/hugo
 # S: Build Lifecycle
 script:
