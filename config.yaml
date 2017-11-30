@@ -1,0 +1,64 @@
+baseurl: "https://tinysong.github.io/"
+DefaultContentLanguage: en
+title: "Michael song"
+theme: "beautifulhugo"
+metaDataFormat: yaml
+pygmentsUseClasses: true
+pygmentsCodeFences: true
+
+author:
+  name: "Michael song"
+  github: tinysong
+  twitter: tiny_xsong
+  youtube: user/username
+  website: "tinysong.github.io"
+
+params:
+  Subtitle: "Thinking and Conclusion about Emacs and Cloud Native"
+  logo: "img/avatar-icon.png"
+  favicon: img/favicon.ico
+  dateFormat: 'January 2, 2006'
+  website: "tinysong.github.io"
+  # Tagline: "一个程序员的思考与总结"
+  # Description: "如果你没有感觉到时间不够用时，你多半正在虚度光阴。"
+  # Keywords: "独立博客,程序员,思考,读书笔记,技术分享"
+  commit: true
+  rss: true
+  # comments: true
+  useChroma: true
+  disable404: false
+  # Pagination
+  paginate:  10
+  paginatePath: "page"
+menu:
+  main:
+    - Name: "Blog"
+      Pre: "<i class='fa fa-heart'></i>"
+      Weight: 3
+      Identifier: "post"
+      URL: "/blog/"
+    - Name: "BOOK"
+      Pre: "<i class='fa fa-heart'></i>"
+      Weight: 4
+      Identifier: "book"
+      URL: "/book/"
+    - Name: "KUBE"
+      Pre: "<i class='fa fa-heart'></i>"
+      Weight: 4
+      Identifier: "kubernetes"
+      URL: "/post/kubernetes/"
+    - Name: "EMACS"
+      Pre: "<i class='fa fa-heart'></i>"
+      Weight: 4
+      Identifier: "emacs"
+      URL: "/emacs/"
+    - Name: "PROJECT"
+      Pre: "<i class='fa fa-heart'></i>"
+      Weight: 4
+      Identifier: "project"
+      URL: "/project/"
+    - Name: "ABOUT"
+      Pre: "<i class='fa fa-road'></i>"
+      Identifier: "about"
+      Weight: 5
+      URL: "/about/"
