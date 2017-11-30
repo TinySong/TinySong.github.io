@@ -3,10 +3,10 @@ language: go
 go:
   - "1.7.1"
 
-install: go get -v github.com/gohugoio/hugo
+# install: go get -v github.com/gohugoio/hugo
 # S: Build Lifecycle
 script:
-  - hugo
+  - binaries/hugo
 
 deploy:
   provider: pages
