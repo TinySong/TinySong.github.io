@@ -1,9 +1,10 @@
----
-title: "{{ replace .TranslationBaseName "-" " " | title }}"
-subtitle: "{{ replace .TranslationBaseName "-" " " | title }}"
-date: {{ .Date }}
-tags: ""
-categories: ""
-type: "post"
-description: ""
----
++++
+categories = [""]
+tags = [""]
+type = "post"
+title = "{{ replace .TranslationBaseName "-" " " | title }}"
+subtitle = "{{ replace .TranslationBaseName "-" " " | title }}"
+date = "{{ .Date }}"
+draft = false
+description= ""
++++
