@@ -9,186 +9,87 @@ draft = false
 description= "收集容器中的日志写入文件的解决方案"
 +++
 
-   fluentd 容器内日志收集，采用使用 agent 将容器日志文件映射到特定目录的方式，然后通过
-   fluentd 抓取，并将日志存储到相应的存储系统中，如 es，hadoop，mysql，es，mongoDB 等。
+   收集容器日志有很多解决方案，fluentd 作为一个由 Cloud Native Computing
+Foundation(CNCF)支持的项目，简化了日志的收集、处理、和存储，易于安装，有灵活的插
+件机制和缓冲，支持日志转发等特点，但目前 fluentd 只支持收集容器标准输出的日志，这
+里我们提供了一种收集容器内部文件日志的解决方案。
+* 需求
+     1. 收集日志规则需要支持正则
+     2. 由于 fluentd 的特点，仍然采用 fluentd 的收集方式
 
-*** 收集容器内日志
-    统一将一个 node(节点) 上容器内的日志通过做软连接的方式放在/var/log/containers/applog/下，
-    在 applog 下文件的软连接的格式如下:
+* 解决思路
+     1. 创建 pod 时，将日志换收集规则写到 pod 的 annotaion 中
+     2. 通过 k8s 的 empty-dir 存储模式，将要收集的容器日志文件挂载到
+     ~/var/lib/kubelet/:podId/volumes/kubernetes.io~empty-dir~ 下
+     2. 通过一个 agent watch k8s pod 的创建修改情况，检索 pod 中 annotaion 是否存在收
+        集规则，若存在则将当前 pod 的信息,则将
+        ~/var/lib/kubelet/:podId/kubernetes.io~empty-dir~ 下 的文件做软连接到
+        fluentd 收集日志的指定目录,如 ~/var/log/containers/applog/~ 下， 然后将
+        fluentd 收集的日志打到 elasticsearch 中
 
-    #+BEGIN_SRC sh
-      <volumeName>.<PodName>_<Namespace>_<containerName>-<containerId>.log.<logFileName>
-      appvolume.ubuntu-write-file_default_ubuntu-write-file-container-79e84190d88a0e639309a05f3c93bf14411e471cf7552f304fe3d3b6178ad87e.log.test_file-xx0xx.234.txt
-    #+END_SRC
-    对上面格式解析：
-     - <volumeName>: appvolume
-     - <PodName> : ubuntu-write-file
-     - <NameSpace>: default
-     - <containerName>: ubuntu-write-file-container
-     - <containerId>: 79e84190d88a0e639309a05f3c93bf14411e471cf7552f304fe3d3b6178ad87e
-     - <logFileName>: test_file-xx0xx.234.txt
-**** 注意
-     在 log 和文件名之间以"."分割
-**** 完整的 fluentd.conf 配置
+* 具体步骤
+** agent
+      agent 通过 client-go(k8s 原生 lib)通过 kcache 创建一个 Informer, 监听 k8s 所有 pod
+      创建/修改/删除等操作，并判断 pod annotations 是否存储收集日志规则，有的话，
+      就将 ~/var/lib/kubelet~ pod 中的文件软件到指定目录
+** 软连接规则
+      这儿需要根据项目的具体情况去操作，可以将所需要的信息添加软连接名字中，然后
+      通过 flentd 的 tag 去解析名字 例如软连接的规则如
+      下：
+      ~appvolume.ubuntu-write-file_default_ubuntu-write-file-container-79e84190d88a0e639309a05f3c93bf14411e471cf7552f304fe3d3b6178ad87e.log.test_file-xx0xx.234.txt~
+      我们可以按照一下规则去解析获得想要的 pod 名称/命名空间/容器名称等等
 
-     #+BEGIN_SRC yaml
-       <source>
-         type tail
-         path /var/log/containers/*.log
-         pos_file /var/log/es-containers.log.pos
-         time_format %Y-%m-%dT%H:%M:%S
-         tag kubernetes.*
-         format json
-         read_from_head true
-       </source>
+      #+BEGIN_SRC js
+        <volumeName>: appvolume
+        <PodName> : ubuntu-write-file
+        <NameSpace>: default
+        <containerName>: ubuntu-write-file-container
+        <containerId>: 79e84190d88a0e639309a05f3c93bf14411e471cf7552f304fe3d3b6178ad87e
+        <logFileName>: test_file-xx0xx.234.txt
+      #+END_SRC
+      这里只是举个例子，具体的命名格式，可以根据业务的需求去定制
+** 注意
+     这里需要注意的是在 log 和文件名之间以"."分割，因为 fluentd 默认的解析规则是只
+     解析文件名的结尾为.log 的文件，这里需要通过 fluentd 的规则文件去解析出来。
 
-       <source>
-         type tail
-         format none
-         path /var/log/salt/minion
-         pos_file /var/log/gcp-salt.pos
-         tag salt
-       </source>
+** fluentd 配置的修改
+      还是以上面的配置为例子，fluentd 的配置中改为如下配置
 
-       <source>
-         type tail
-         format none
-         path /var/log/startupscript.log
-         pos_file /var/log/es-startupscript.log.pos
-         tag startupscript
-       </source>
+      #+BEGIN_SRC yaml
+               <source>
+                 type tail
+                 format none
+                 path /var/log/containers/applog/*
+                 pos_file /var/log/es-containers-app.log.pos
+                 tag reform.*
+                 read_from_head true
+               </source>
 
-       <source>
-         type tail
-         format none
-         path /var/log/docker.log
-         pos_file /var/log/es-docker.log.pos
-         tag docker
-       </source>
+               <match reform.**>
+                 type record_reformer
+                 renew_record false
+                 enable_ruby true
+                 tag kubernetes.${tag_parts[1]}.${tag_parts[2]}.${tag_parts[3]}.${tag_parts[6]}.log
+                 <record>
+                   logvolume ${tag_parts[5]}
+                   filename ${tag_suffix[8]}
+                   log ${message}
+                   stream file
+                 </record>
+                 remove_keys message
+               </match>
 
-       <source>
-         type tail
-         format none
-         path /var/log/etcd.log
-         pos_file /var/log/es-etcd.log.pos
-         tag etcd
-       </source>
-
-       <source>
-         type tail
-         format none
-         path /var/log/kubelet.log
-         pos_file /var/log/es-kubelet.log.pos
-         tag kubelet
-       </source>
-
-       <source>
-         type tail
-         format none
-         path /var/log/kube-apiserver.log
-         pos_file /var/log/es-kube-apiserver.log.pos
-         tag kube-apiserver
-       </source>
-
-       <source>
-         type tail
-         format none
-         path /var/log/kube-controller-manager.log
-         pos_file /var/log/es-kube-controller-manager.log.pos
-         tag kube-controller-manager
-       </source>
-
-       <source>
-         type tail
-         format none
-         path /var/log/kube-scheduler.log
-         pos_file /var/log/es-kube-scheduler.log.pos
-         tag kube-scheduler
-       </source>
-
-       <source>
-         type tail
-         format none
-         path /var/log/containers/applog/*
-         pos_file /var/log/es-containers-app.log.pos
-         tag reform.*
-         read_from_head true
-       </source>
-
-       <match reform.**>
-         type record_reformer
-         renew_record false
-         enable_ruby true
-         tag kubernetes.${tag_parts[1]}.${tag_parts[2]}.${tag_parts[3]}.${tag_parts[6]}.log
-         <record>
-           logvolume ${tag_parts[5]}
-           filename ${tag_suffix[8]}
-           log ${message}
-           stream file
-         </record>
-         remove_keys message
-       </match>
-
-
-       <filter kubernetes.**>
-         type kubernetes_metadata
-       </filter>
-
-       <match kubernetes.**>
-         type record_reformer
-         time_nano ${t = Time.now; ((t.to_i * 1000000000) + t.nsec).to_s}
-         tag ${tag_suffix[1]}
-       </match>
-
-       <match **>
-          type elasticsearch
-          log_level info
-          include_tag_key true
-          host elasticsearch-logging
-          port 9200
-          logstash_format true
-          # Set the chunk limit the same as for fluentd-gcp.
-          buffer_chunk_limit 2m
-          # Cap buffer memory usage to 512KB/chunk * 128 chunks = 65 MB
-          buffer_queue_limit 128
-          flush_interval 2s
-          # Never wait longer than 5 minutes between retries.
-          max_retry_wait 300
-          # Disable the limit on the number of retries (retry forever).
-          disable_retry_limit
-       </match>
-     #+END_SRC
+      #+END_SRC
+*** 对特定的文件做标记
+        source 是配置的读取源路径,如上配置，读取的源为/var/log/containers/applog/
+      下的所有文件，并在读取的文件前加一个 tag 为 reform。然后通过 match 操作解析上
+      面做了 reform 标记的文件
+*** 修改为 fluentd 支持的格式
+    match 到刚才做了 reform 标记的文件，通过 tag_parts 将文件名重组为 k8s fluentd 支持
+    的格式
 
 *** 扩展阅读
-**** fluentd process nested JSON
-    - Process nested JSON with Fluentd - Stack Overflow
-      https://stackoverflow.com/questions/35621964/process-nested-json-with-fluentd
-***** eg
-     + nested json
-
-       #+BEGIN_SRC js
-         {"event" : {"name" : "toto", "date" : 14....11}}
-       #+END_SRC
-
-     + correct fluentd config
-       need enable_ruby, and modify record
-       #+BEGIN_SRC yaml
-         <filter **>
-           @type record_transformer
-           enable_ruby
-           <record>
-             event_date ${time.strftime('%Y-%m-%dT%H:%M:%S')}
-
-           </record>
-
-         </filter>
-       #+END_SRC
-**** 参考
-***** sonots/fluent-plugin-record-reformer
-       https://github.com/sonots/fluent-plugin-record-reformer
-***** 日志收集工具 Fluentd 使用总结
-      http://www.imekaku.com/2016/09/26/fluentd-conclusion/
-***** k8s 应用内部日志收集
-      http://blog.csdn.net/ptmozhu/article/details/53132942
-***** AliyunContainerService/fluentd-pilot:
-      https://github.com/AliyunContainerService/fluentd-pilot
+    1. [[https://github.com/sonots/fluent-plugin-record-reformer][sonots/fluent-plugin-record-reformer]]
+    2. [[http://www.imekaku.com/2016/09/26/fluentd-conclusion/][日志收集工具 Fluentd 使用总结]]
+    3. [[http://blog.csdn.net/ptmozhu/article/details/53132942][k8s 应用内部日志收集]]
+    4. [[https://github.com/AliyunContainerService/fluentd-pilot][AliyunContainerService/fluentd-pilot]]
