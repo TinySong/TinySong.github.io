@@ -40,11 +40,11 @@ menu:
       Weight: 4
       Identifier: "book"
       URL: "/book/"
-    - Name: "KUBE"
+    - Name: "KUBERNETE"
       Pre: "<i class='fa fa-heart'></i>"
       Weight: 4
       Identifier: "kubernetes"
-      URL: "/kubernetes/"
+      URL: "/k8s/"
     - Name: "EMACS"
       Pre: "<i class='fa fa-heart'></i>"
       Weight: 4
