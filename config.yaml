@@ -1,4 +1,4 @@
-baseurl: "https://tinysong.github.io"
+baseurl: "https://tinysong.github.io/"
 DefaultContentLanguage: en
 title: "Michael song"
 theme: "beautifulhugo"
