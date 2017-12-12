@@ -6,8 +6,7 @@ metaDataFormat: yaml
 pygmentsUseClasses: true
 pygmentsCodeFences: true
 hasCJKLanguage: true
-disqusShortname: "Michael song"
-#TODO: comments https://gohugo.io/content-management/comments/,https://gohugo.io/templates/partials/#disqus
+disqusShortname: "michael-song"
 author:
   name: "Michael song"
   github: tinysong
