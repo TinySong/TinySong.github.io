@@ -1,12 +1,12 @@
 ---
- categories : ["hugo"]
- tags : ["hugo"]
- type : "post" 
- title : "Hugo Issue" 
- subtitle : "Hugo Issue" 
- date = "2017-12-12T22:24:59+08:00"
- draft = false 
- description= "hugo 中遇到的一些问题"
+ categories: ["hugo"]
+ tags: ["hugo"]
+ type: "post" 
+ title: "Hugo Issue" 
+ subtitle: "Hugo Issue" 
+ date: "2017-12-12T22:24:59+08:00"
+ draft: false 
+ description: "hugo 中遇到的一些问题"
 
 ---
 
