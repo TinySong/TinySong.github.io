@@ -1,8 +1,17 @@
+---
+title: "Node Exporter"
+subtitle: "Node Exporter"
+date: 2017-12-15T14:33:39+08:00
+tags: ["node_exporter", "kuberntes", "prometheus"]
+type: "post"
+categories: ["node_exporter", "kuberntes", "prometheus"]
+description: "node_exporter 实践"
+---
+
 - [cpu 监控](#org208b27f)
   - [扩展阅读](#org292d01b)
 - [memory 监控](#org19f93d7)
 
-&#x2014; title: "Node Exporter" subtitle: "Node Exporter" date: 2017-12-15T14:33:39+08:00 tags: ["node<sub>exporter</sub>", "kuberntes", "prometheus"] type: "post" categories: ["node<sub>exporter</sub>", "kuberntes", "prometheus"] description: "node<sub>exporter</sub> 实践" &#x2014;
 
 node<sub>exporter</sub> 作为 prometheus 的监控插件，主要用于监控节点信息，如节点的 cpu，网络， 等等，详情可见[github 官网](https://github.com/prometheus/node_exporter)
 
