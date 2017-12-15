@@ -57,3 +57,7 @@ node_exporter 作为 prometheus 的监控插件，主要用于监控节点信息
       100 - (avg by (instance) (irate(node_cpu{instance="node-1",mode="idle"}[5m])) * 100)
   #+END_SRC
   这样就可以计算出节点 ~node-1~ 的 cpu 占用率
+
+** 扩展阅读
+   + Understanding Linux CPU stats
+ 	 http://blog.scoutapp.com/articles/2015/02/24/understanding-linuxs-cpu-stats

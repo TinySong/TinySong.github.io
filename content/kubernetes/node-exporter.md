@@ -8,12 +8,14 @@ categories: ["node_exporter", "kuberntes", "prometheus"]
 description: "node_exporter 实践"
 ---
 
-- [cpu 监控](#orgc3ed17b)
+- [cpu 监控](#orge141b43)
+  - [扩展阅读](#org07e89f7)
+
 
 node<sub>exporter</sub> 作为 prometheus 的监控插件，主要用于监控节点信息，如节点的 cpu，网络， 等等，详情可见[github 官网](https://github.com/prometheus/node_exporter)
 
 
-<a id="orgc3ed17b"></a>
+<a id="orge141b43"></a>
 
 # cpu 监控
 
@@ -57,3 +59,12 @@ node_cpu{cpu="cpu1",mode="user"} 221986.68
 对于用户来说主要关系的应该是除 idle 的其他 mode cpu 占用率，可通过 prometheus 提供的 聚合方法计算出 cpu 的占用率，公式如下：
 
 ,#+BEGIN<sub>SRC</sub> sh 100 - (avg by (instance) (irate(node<sub>cpu</sub>{instance="node-1",mode="idle"}[5m])) \* 100) \\#+END<sub>SRC</sub> 这样就可以计算出节点 `node-1` 的 cpu 占用率
+
+
+<a id="org07e89f7"></a>
+
+## 扩展阅读
+
+-   Understanding Linux CPU stats
+
+<http://blog.scoutapp.com/articles/2015/02/24/understanding-linuxs-cpu-stats>
