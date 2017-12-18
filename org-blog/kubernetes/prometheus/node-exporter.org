@@ -207,4 +207,9 @@ node_exporter 作为 prometheus 的监控插件，主要用于监控节点信息
   #+BEGIN_SRC sh
     (node_memory_MemTotal{instance="node-4"} -node_memory_MemFree{instance="node-4"})/1024/1024
   #+END_SRC
-  即可计算出node-4节点的目前主机使用的内存数（单位M）
+  即可计算出node-4节点的目前主机使用的内存数（单位M）若 使用dpdk用于sriov时，可
+  通过这种方式获取huge Page的情况。
+
+** 扩展阅读
+   + "/proc/meminfo之谜 | Linux Performance"
+ 	  http://linuxperf.com/?p=142

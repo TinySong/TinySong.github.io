@@ -1,3 +1,13 @@
+---
+categories : [kubernetes"]
+tags : ["install","kubernetes"]
+type : "post"
+title :  "k8s 1.8 安装"
+subtitle : "kubernetes 1.8.3"
+date : "2017-08-24"
+draft : false
+description: "k8s 1.8 原生安装教程"
+---
 
 * 基于 kubeadm 安装 kubernetes 1.8.3
 ** 环境
@@ -145,7 +155,7 @@
          systemctl start docker
        #+END_SRC
     假如不生效的话， 有肯定防火墙没有关闭, ~systemctl disable firewalld~ 关闭后，
-    reboot 重启试下
+    reboot 重启试下,经过排查，造成这个问题的原因是 kube-proxy 设置 ipvs 造成的。
 
 
 ** 扩展阅读
