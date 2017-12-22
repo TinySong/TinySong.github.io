@@ -238,7 +238,7 @@ description: "lvs 在 k8s 1.8 中的应用-ipvs"
     ip_vs*.ko,否则 kube-dns 会一直报错 ~dns.go:174] Waiting for services and
     endpoints to be initialized from apiserver~,解决办法：在目录
     ~/etc/sysconfig/modules/~ 下创建 ipvs.modules 文件，将需要加载的 ko 写入，如：
-
+    并设置 ipvs.modules 执行权限: ~chmod +x /etc/sysconfig/modules/ipvs.modules~
     #+BEGIN_SRC sh
       #!/bin/bash
       modprobe ip_vs

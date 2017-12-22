@@ -9,50 +9,50 @@ draft : false
 description: "lvs 在 k8s 1.8 中的应用-ipvs"
 ---
 
-- [在 kubernetes 1.8.3 上设置 kube-proxy 的 ipvs 模式](#org6e9048b)
-  - [ipvs 简单介绍](#org0ba5832)
-  - [kube-proxy ipvs 模式设置](#org5c503c4)
-    - [centos 关闭 SELinux](#org486cd30)
-    - [firewall 关闭](#orgb7f74da)
-    - [内核参数调整](#org061f978)
-    - [load kernel ko](#org405e0d6)
-    - [修改 kube-proxy 配置](#orgff2cbf8)
-    - [错误以及解决方案](#org936dedf)
-  - [测试](#org3b43ce4)
-  - [调试编译](#org7dd1fe7)
-    - [编译](#org4d6d39e)
-    - [debug 命令](#orga7c46a3)
-  - [扩展阅读](#orge8e3134)
-  - [Test validation](#orgd8c41f5)
-    - [Functionality tests, all below traffic should be reachable](#org4f4d143)
-    - [Test service with ServiceAffinity=ClientIP. Validate IPVS has persistence for the service.](#org62c56bc)
-  - [IPCS vs IPTables 对比](#org64125a5)
-    - [IPTables:](#org7bd76ba)
-    - [Why use IPVS?](#orgfbe4d57)
-  - [注意](#orgb020cb9)
-    - [ipvs 与 kube-dns](#org97382f9)
+- [在 kubernetes 1.8.3 上设置 kube-proxy 的 ipvs 模式](#orgdcb0c84)
+  - [ipvs 简单介绍](#orgebfe5f9)
+  - [kube-proxy ipvs 模式设置](#org7bae552)
+    - [centos 关闭 SELinux](#org87ee160)
+    - [firewall 关闭](#org91abb87)
+    - [内核参数调整](#orgbc9346b)
+    - [load kernel ko](#org448504f)
+    - [修改 kube-proxy 配置](#org205dd1e)
+    - [错误以及解决方案](#org345848e)
+  - [测试](#orgb644e1b)
+  - [调试编译](#orgd134e55)
+    - [编译](#org3f796b9)
+    - [debug 命令](#org916b0fe)
+  - [扩展阅读](#org2ab6dca)
+  - [Test validation](#orgc4d1c90)
+    - [Functionality tests, all below traffic should be reachable](#org508f776)
+    - [Test service with ServiceAffinity=ClientIP. Validate IPVS has persistence for the service.](#orgb08b0c4)
+  - [IPCS vs IPTables 对比](#org461d9a4)
+    - [IPTables:](#org4d58a42)
+    - [Why use IPVS?](#org8d99bb2)
+  - [注意](#orgcfcc094)
+    - [ipvs 与 kube-dns](#org252e5d6)
 
 
-<a id="org6e9048b"></a>
+<a id="orgdcb0c84"></a>
 
 # 在 kubernetes 1.8.3 上设置 kube-proxy 的 ipvs 模式
 
 在 k8s 1.8 中，kube-proxy 对 ipvs 的支持进入到 alpha 版本,目前 ipvs 只支持 nat 模式，本 片文章主要从讲解 kube-proxy ipvs 模式的配置，以及验证方式，其他相关知识会会有响 应的章节介绍，但不是主要内容
 
 
-<a id="org0ba5832"></a>
+<a id="orgebfe5f9"></a>
 
 ## ipvs 简单介绍
 
 ipvs 是于 netfilt 结合在一起使用的，ipvs 作为 netfilter 的模块存在, ipvs 附属在 INPUT 链上工作的。ipvs 支持三种工作模式：Nat，ip tunel,DirectMode,针对这几种默认 以及 ipvs 的简单介绍，见扩展阅读
 
 
-<a id="org5c503c4"></a>
+<a id="org7bae552"></a>
 
 ## kube-proxy ipvs 模式设置
 
 
-<a id="org486cd30"></a>
+<a id="org87ee160"></a>
 
 ### centos 关闭 SELinux
 
@@ -74,7 +74,7 @@ SELINUXTYPE=targeted
 ```
 
 
-<a id="orgb7f74da"></a>
+<a id="org91abb87"></a>
 
 ### firewall 关闭
 
@@ -85,7 +85,7 @@ systemctl disable firewalld
 ```
 
 
-<a id="org061f978"></a>
+<a id="orgbc9346b"></a>
 
 ### 内核参数调整
 
@@ -117,7 +117,7 @@ net.bridge.bridge-nf-call-ip6tables = 1
 ```
 
 
-<a id="org405e0d6"></a>
+<a id="org448504f"></a>
 
 ### load kernel ko
 
@@ -138,7 +138,7 @@ lsmod | grep ip_vs
 ```
 
 
-<a id="orgff2cbf8"></a>
+<a id="org205dd1e"></a>
 
 ### 修改 kube-proxy 配置
 
@@ -166,7 +166,7 @@ spec:
 由于 kube-proxy 是由 daemonSet 方式启动，修改后 pod 会自动重启
 
 
-<a id="org936dedf"></a>
+<a id="org345848e"></a>
 
 ### 错误以及解决方案
 
@@ -179,7 +179,7 @@ ERROR: ../libkmod/libkmod.c:557 kmod_search_moddep() could not open moddep file 
 这时，通过 `hostPath` 挂载方式将/lib/modules 挂载到 pod 中即可解决
 
 
-<a id="org3b43ce4"></a>
+<a id="orgb644e1b"></a>
 
 ## 测试
 
@@ -235,12 +235,12 @@ kubectl run myip --image=192.168.1.55/tenx_containers/whats-my-ip:latest --repli
         通过第五步的输出可看出，当前是 rr 模式访问的各个 endpoint
 
 
-<a id="org7dd1fe7"></a>
+<a id="orgd134e55"></a>
 
 ## 调试编译
 
 
-<a id="org4d6d39e"></a>
+<a id="org3f796b9"></a>
 
 ### 编译
 
@@ -254,7 +254,7 @@ apt-get install libnl-genl-3-dev
 centos 7.4 默认已经安装了
 
 
-<a id="orga7c46a3"></a>
+<a id="org916b0fe"></a>
 
 ### debug 命令
 
@@ -265,7 +265,7 @@ apt-get install ipvsadm
 ```
 
 
-<a id="orge8e3134"></a>
+<a id="org2ab6dca"></a>
 
 ## 扩展阅读
 
@@ -283,12 +283,12 @@ apt-get install ipvsadm
 -   ipvs offical document "kubernetes/pkg/proxy/ipvs at master · kubernetes/kubernetes" <https://github.com/kubernetes/kubernetes/tree/master/pkg/proxy/ipvs#load-ipvs-kernel-modules>
 
 
-<a id="orgd8c41f5"></a>
+<a id="orgc4d1c90"></a>
 
 ## Test validation
 
 
-<a id="org4f4d143"></a>
+<a id="org508f776"></a>
 
 ### Functionality tests, all below traffic should be reachable
 
@@ -315,17 +315,17 @@ apt-get install ipvsadm
     -   container -> host (cross host)
 
 
-<a id="org62c56bc"></a>
+<a id="orgb08b0c4"></a>
 
 ### Test service with ServiceAffinity=ClientIP. Validate IPVS has persistence for the service.
 
 
-<a id="org64125a5"></a>
+<a id="org461d9a4"></a>
 
 ## IPCS vs IPTables 对比
 
 
-<a id="org7bd76ba"></a>
+<a id="org4d58a42"></a>
 
 ### IPTables:
 
@@ -334,7 +334,7 @@ apt-get install ipvsadm
 -   IPTables has more operations: SNAT, DNAT, reject packets, port translation etc.
 
 
-<a id="orgfbe4d57"></a>
+<a id="org8d99bb2"></a>
 
 ### Why use IPVS?
 
@@ -346,18 +346,18 @@ apt-get install ipvsadm
 -   Supports sticky sessions
 
 
-<a id="orgb020cb9"></a>
+<a id="orgcfcc094"></a>
 
 ## 注意
 
 最后说一点: ipvs 尚未稳定，请慎用；而且 &#x2013;masquerade-all 选项与 Calico 安全策略控制不兼容，请酌情考虑使用(Calico 在做网络策略限制的时候要求不能开启此选项)
 
 
-<a id="org97382f9"></a>
+<a id="org252e5d6"></a>
 
 ### ipvs 与 kube-dns
 
-当 kube-proxy 设置为 ipvs 模式，重启设备时，需要将 ip<sub>vs</sub>\*.ko 设置为启动自动加载 ip<sub>vs</sub>\*.ko,否则 kube-dns 会一直报错 `dns.go:174] Waiting for services and endpoints to be initialized from apiserver`,解决办法：在目录 `/etc/sysconfig/modules/` 下创建 ipvs.modules 文件，将需要加载的 ko 写入，如：
+当 kube-proxy 设置为 ipvs 模式，重启设备时，需要将 ip\_vs\*.ko 设置为启动自动加载 ip\_vs\*.ko,否则 kube-dns 会一直报错 `dns.go:174] Waiting for services and endpoints to be initialized from apiserver`,解决办法：在目录 `/etc/sysconfig/modules/` 下创建 ipvs.modules 文件，将需要加载的 ko 写入，如： 并设置 ipvs.modules 执行权限: `chmod +x /etc/sysconfig/modules/ipvs.modules`
 
 ```sh
 #!/bin/bash
@@ -369,4 +369,4 @@ modprobe nf_conntrack_ipv4
 
 ```
 
-重启设备后，会自动加载 ip<sub>vs</sub>\*.ko 文件，解决 kube-dns 报错问题
+重启设备后，会自动加载 ip\_vs\*.ko 文件，解决 kube-dns 报错问题
