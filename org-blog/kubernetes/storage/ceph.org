@@ -6,7 +6,7 @@ tags: ["ceph","luminous"]
 type: "post"
 categories: ["ceph","storage"]
 description: ""
---
+---
 
 * ceph luminous install on centos
 

@@ -6,7 +6,8 @@ tags: ["ceph","luminous"]
 type: "post"
 categories: ["ceph","storage"]
 description: ""
---
+---
+
 
 - [ceph luminous install on centos](#sec-1)
   - [前期准备](#sec-1-1)
