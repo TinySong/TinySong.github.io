@@ -208,3 +208,11 @@ description: ""
  	 http://www.isjian.com/ceph/deploy-a-ceph-cluster-use-ceph-deploy/#%E7%8E%AF%E5%A2%83%E9%A2%84%E6%A3%80
    3. 预检 — Ceph Documentation
  	 http://docs.ceph.org.cn/start/quick-start-preflight/
+
+** 版本更新
+   1. Ceph v12.2 Luminous 正式版本发布 – Ceph 国内社区
+ 	 http://ceph.org.cn/2017/08/30/ceph-v12-2-luminous%E6%AD%A3%E5%BC%8F%E7%89%88%E6%9C%AC%E5%8F%91%E5%B8%83/
+
+** 升级
+   1. 升级 Ceph 集群从 Kraken 到 Luminous — 青蛙小白
+ 	 https://blog.frognew.com/2017/11/upgrade-ceph-from-kraken-to-luminous.html#3%E6%9B%B4%E6%96%B0%E5%90%84%E8%8A%82%E7%82%B9ceph%E8%BD%AF%E4%BB%B6%E5%8C%85
