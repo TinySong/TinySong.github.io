@@ -1,0 +1,261 @@
+---
+title: "Ceph luminous Install"
+subtitle: "Ceph"
+date: 2017-12-25T15:30:00+08:00
+tags: ["ceph","luminous"]
+type: "post"
+categories: ["ceph","storage"]
+description: ""
+--
+
+- [ceph luminous install on centos](#sec-1)
+  - [前期准备](#sec-1-1)
+    - [内核版本](#sec-1-1-1)
+    - [安装 luminous 源](#sec-1-1-2)
+    - [安装 ceph 部署工具](#sec-1-1-3)
+    - [ceph 节点安装](#sec-1-1-4)
+  - [安装过程](#sec-1-2)
+    - [ceph 集群](#sec-1-2-1)
+    - [卸载 ceph 集群](#sec-1-2-2)
+  - [ceph 块设备](#sec-1-3)
+  - [ceph-mgr](#sec-1-4)
+    - [luminous 重要的变化](#sec-1-4-1)
+  - [引用](#sec-1-5)
+
+
+# ceph luminous install on centos<a id="sec-1"></a>
+
+## 前期准备<a id="sec-1-1"></a>
+
+### 内核版本<a id="sec-1-1-1"></a>
+
+目前 ceph 官方提供的建议是，内核版本要求在 4.1.4 or later, 最低要求是 3.10.\*, 当然高版本可支持的 ceph 的功能更加完善，主要还是要看业务需要，再升级内核, kernel 版本对应的新功能的对照表：
+
+| 功能                           | 内核版本      |
+| firefly(CRUSH\_TUNSBLES3) 可调选项 | 3.15 开始支持 |
+| B-tree 文件系统(Btrfs)         | 3.14 or later |
+|                                |               |
+
+1.  注意事项
+
+    -   默认内核 btrfs 版本较老，不推荐用于 ceph-osd 存储节点，要升级到推荐的内核，或 者改用 xfs, ext4
+    -   默认内核带的 ceph 客户端较老，不推荐做内核空间客户端(内核 RBD 或 Ceph 文件系 统),需要升级内核
+    -   默认内核或已安装的 glibc 版本若不支持 rsncfs(2)系统调用，同一个机器上使用 xfs 或 ext4 的 ceph-osd 守护进程性能不会如愿。
+    -   从 Infernalis 版起，用户名 “ceph” 保留给了 Ceph 守护进程。如果 Ceph 节点上已经有了 “ceph” 用户，升级前必须先删掉这个用户。
+
+2.  升级内核
+
+### 安装 luminous 源<a id="sec-1-1-2"></a>
+
+需要将以下 luminous 源写入 **各个节点** /etc/yum.conf.d/ceph.repo 中
+
+```sh
+[ceph]
+name=ceph
+baseurl=http://mirrors.163.com/ceph/rpm-luminous/el7/x86_64/
+gpgcheck=0
+[ceph-noarch]
+name=cephnoarch
+baseurl=http://mirrors.163.com/ceph/rpm-luminous/el7/noarch/
+gpgcheck=0
+```
+
+执行 `yum makecache` 命令，刷新安装包缓存
+
+### 安装 ceph 部署工具<a id="sec-1-1-3"></a>
+
+```sh
+yum install ceph-deploy
+```
+
+**注意：只在 master 节点上安装，slave 节点不需要安装**
+
+### ceph 节点安装<a id="sec-1-1-4"></a>
+
+1.  安装 ntp
+
+    **建议在所有 Ceph 节点上安装 NTP 服务（特别是 Ceph Monitor 节点），以免因时钟漂移导致故障**
+    
+    ```sh
+    yum install ntp ntpdate ntp-doc
+    ```
+    
+    设置 crontab 自动同步时间 \*/13 \* \* \* \* /usr/sbin/ntpdate -u time.cbdtelecom.cn
+
+2.  创建部署 ceph 的用户
+
+    见[ceph 官方文档](http://docs.ceph.org.cn/start/quick-start-preflight/) 在 **各个** 节点上通过以下命令创建一个 tenxcloud 用户，
+    
+    ```sh
+    useradd -d /home/tenxcloud -m tenxcloud
+    passwd tenxcloud
+    echo "tenxcloud ALL = (root) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/tenxcloud
+    chmod 0440 /etc/sudoers.d/tenxcloud
+    ```
+
+## 安装过程<a id="sec-1-2"></a>
+
+### ceph 集群<a id="sec-1-2-1"></a>
+
+创建集群时，若未安装过 ceph 集群则不需要执行 purgedata 和 purge 命令, 若时重装的 话，需要执行，清除之前的数据，防止造成数据污染
+
+1.  purgedata
+
+    ```sh
+    # 如果只想清除 /var/lib/ceph 下的数据、并保留 Ceph 安装包
+    ceph-deploy purgedata ceph-slave-15 ceph-slave-16
+    # 要清理掉 /var/lib/ceph 下的所有数据、并卸载 Ceph 软件包
+    ceph-deploy purge ceph-slave-15 ceph-slave-16
+    ```
+    
+    若节点上已经安装了 ceph,purgedata 时会报错，可 以使用执行 `ceph-deploy purge {ceph-node} [{ceph-node}]`,可以连 ceph 安装包一 起清除。
+
+2.  ceph 集群初始化
+
+    ```sh
+    ceph-deploy new ceph-master-11
+    #上步会创建一个 ceph.conf 配置文件和一个监视器密钥环到各个节点的/etc/ceph/目录，ceph.conf 中会有`fsid`，`mon_initial_members`，`mon_host`三个参数#默认 ceph 使用集群名 ceph，可以使用下面命令创建一个指定的 ceph 集群名称
+    #ceph-deploy --cluster {cluster-name} new {host [host], ...}
+    ```
+    
+    Ceph Monitors 之间默认使用 6789 端口通信，OSD 之间默认用 6800:7300 范围内 的端口通信，多个集群应当保证端口不冲突 **\*\*** ceph 软件包安装 通过以下命令，安装 ceph 软件包到三个节点上
+    
+    ```sh
+    ceph-deploy install --release luminous ceph-master-11 ceph-slave-15 ceph-slave-16
+    ```
+    
+    注意点需要添加 `--release luminous` ，为了安装指定的版本
+
+3.  添加 mons
+
+    ```sh
+    ceph-deploy mon create-initial
+    ```
+    
+    执行完后，默认在当前目录下生成以下文件列表
+    
+    ```sh
+    [root@ceph-master-11 luminous-deploy]# ls
+    ceph.bootstrap-mds.keyring  ceph.bootstrap-osd.keyring  ceph.client.admin.keyring  ceph-deploy-ceph.log
+    ceph.bootstrap-mgr.keyring  ceph.bootstrap-rgw.keyring  ceph.conf                  ceph.mon.keyring
+    ```
+    
+    执行 ceph -s 时，会提示错误
+    
+    ```sh
+     root@ceph-master-11 luminous-deploy]# ceph -s
+    2017-12-25 18:38:19.452958 7fd10a8fe700 -1 auth: unable to find a keyring on /etc/ceph/ceph.client.admin.keyring,/etc/ceph/ceph.keyring,/etc/ceph/keyring,/etc/ceph/keyring.bin,: (2) No such file or directory
+    2017-12-25 18:38:19.452994 7fd10a8fe700 -1 monclient: ERROR: missing keyring, cannot use cephx for authentication
+    2017-12-25 18:38:19.452997 7fd10a8fe700  0 librados: client.admin initialization error (2) No such file or directory
+    ```
+    
+    这里需要将 ceph.client.admin.keyring 同步到各个节点的/etc/ceph 目录下，并设 置可读权限 : `chmod +r /etc/ceph/ceph.client.admin.keyring`
+    
+    1.  将\*.keyring 同步到其他 node 节点上
+        
+        ```sh
+        ceph-deploy admin ceph-master-11 ceph-slave-15 ceph-slave-16
+        ```
+
+4.  添加 osd
+
+    OSD node 是真正存储数据的节点，我们需要为 ceph-osd 提供独立存储空间，一般是一 个独立的 disk。但我们环境不具备这个条件，于是在本地盘上创建了个目录，提供给 OSD。 分别登陆到两个 slave 节点执行以下命令
+    
+    ```sh
+    ssh ceph-slave-15
+    sudo mkdir /ceph-data/osd0
+    sudo chown -R ceph:ceph /ceph-data/osd0       # 由于 ceph 默认使用 ceph 用户名和用户组启动 ceph 服务，不进行设置的话，会造成 osd 无法启动
+    exit
+    ssh ceph-slave-16
+    sudo mkdir /ceph-data/osd1
+    sudo chown -R ceph:ceph /ceph-data/osd1
+    exit
+    ```
+    
+    创建 osd
+    
+    ```sh
+    ceph-deploy osd create ceph-slave-16:/ceph-data/osd1 ceph-slave-15:/ceph-data/osd0 # (create equal prepare and active)
+    ```
+
+5.  检查 ceph 状态
+
+    ```sh
+    [root@ceph-slave-15 ~]# ceph -s
+    cluster:
+    id:     1eaa46c4-67c2-4a22-a1c3-f6fde2915a4e
+    health: HEALTH_WARN
+    no active mgr
+    
+    services:
+    mon: 1 daemons, quorum ceph-master-11
+    mgr: no daemons active
+    osd: 2 osds: 2 up, 2 in               # osd 启动正常
+    
+    data:
+    pools:   0 pools, 0 pgs
+    objects: 0 objects, 0 bytes
+    usage:   0 kB used, 0 kB / 0 kB avail
+    pgs:
+    
+    [root@ceph-slave-15 ~]# ceph osd tree
+    ID CLASS WEIGHT  TYPE NAME              STATUS REWEIGHT PRI-AFF
+    -1       0.01959 root default
+    -3       0.00980     host ceph-slave-15
+    0   hdd 0.00980         osd.0              up  1.00000 1.00000
+    -5       0.00980     host ceph-slave-16
+    1   hdd 0.00980         osd.1              up  1.00000 1.00000
+    
+    ```
+    
+    至此，ceph 集群基本组件已经安装完成
+
+### 卸载 ceph 集群<a id="sec-1-2-2"></a>
+
+```sh
+#卸载指定节点上的 ceph 软件包
+ceph-deploy uninstall {hostname1 hostname2 ...}
+#清除数据
+#如果只想清除 /var/lib/ceph 下的数据、并保留 Ceph 安装包
+ceph-deploy purgedata [hostname1 hostname2 ...]
+
+#要清理掉 /var/lib/ceph 下的所有数据、并卸载 Ceph 软件包
+ceph-deploy purge [hostname1 hostname2 ...]
+```
+
+当重装时，可通过以上命令删除后，再次重新部署。
+
+## ceph 块设备<a id="sec-1-3"></a>
+
+由于业务的原因，这里只用到了块设备，ceph 块设备利用 RADOS 实现了快照、复制和一 致性。Ceph 的 RADOS 块设备（RBD）使用内核模块或 librbd 库与 OSD 交互 \*Note 内核模块可使用 Linux 页缓存。对基于 librbd 的应用程序，Ceph 可提供 [RBD 缓存](http://docs.ceph.org.cn/rbd/rbd-config-ref/) \*,ceph 集群可以同事运行 Ceph Rados 网关、ceph FS 文件系统、Ceph 块设备。
+
+osd 服务启动后，则可以通过以下命令创建 pool
+
+```sh
+ceph osd pool create tenx-pool 256 256
+```
+
+对于 pool 的一些命令操作可参考[rbd 官网](http://docs.ceph.org.cn/man/8/rbd/) 的博客 ceph 修改 PG 数量: <http://thinnote.com/archives/1718>
+
+## ceph-mgr<a id="sec-1-4"></a>
+
+<http://www.zphj1987.com/2017/06/25/ceph-luminous-new-dashboard/>
+
+### luminous 重要的变化<a id="sec-1-4-1"></a>
+
+-   默认的消息处理从 simple 变成了 async 了（ms\_type = async+posix）
+-   默认的后端存储从 filestore 变成了 bluestore 了
+
+## 引用<a id="sec-1-5"></a>
+
+1.  使用 Ceph RBD 为 Kubernetes 集群提供存储卷 | Tony Bai
+
+<http://tonybai.com/2016/11/07/integrate-kubernetes-with-ceph-rbd/>
+
+1.  使用 ceph-deploy 工具部署 ceph 集群 | opengers
+
+<http://www.isjian.com/ceph/deploy-a-ceph-cluster-use-ceph-deploy/#%E7%8E%AF%E5%A2%83%E9%A2%84%E6%A3%80>
+
+1.  预检 — Ceph Documentation
+
+<http://docs.ceph.org.cn/start/quick-start-preflight/>
