@@ -1,0 +1,831 @@
+* kubernete 监控相关汇总
+** aggregation layer
+  To use custom metrics with your Horizontal Pod Autoscaler, you must set the
+  necessary configurations when deploying your cluster:
+  1. [[https://kubernetes.io/docs/tasks/access-kubernetes-api/configure-aggregation-layer/][enable the API aggregation layer]]  if you have not already done so.
+   #+BEGIN_SRC sh
+    --requestheader-client-ca-file=<path to aggregator CA cert>
+    --requestheader-allowed-names=aggregator
+    --requestheader-extra-headers-prefix=X-Remote-Extra-
+    --requestheader-group-headers=X-Remote-Group
+    --requestheader-username-headers=X-Remote-User
+    --proxy-client-cert-file=<path to aggregator proxy cert>
+    --proxy-client-key-file=<path to aggregator proxy key>
+   #+END_SRC
+   在 k8s1.9 安装时，以上参数已自动安装，需要修改 requestheader-allowed-names 参数,
+     默认值为 front-proxy-client, 修改如下：
+     #+BEGIN_SRC sh
+       --requestheader-allowed-names=front-proxy-client,aggregator
+     #+END_SRC
+** kube-controller
+   需要添加参数
+  #+BEGIN_SRC sh
+    --horizontal-pod-autoscaler-use-rest-clients=true     #
+    --kubeconfig <path-to-kubeconfig> OR --master <ip-address-of-apiserver>
+  #+END_SRC
+   可以使用--master 或--kubeconfig 标志; - 如果同时指定了两者，master 将覆
+   盖--kubeconfig。这些标志指定 API 聚合层的位置，允许控制器管理器与 API 服务器
+   进行通信。
+
+** metric-server(core metrics)
+     metrics-server 一个缩小版的 heapster，目前主要收集资源最新的的 cpu 和内存数据，
+     并将数据存放在内存中，这些 metrics 由核心系统组件使用，如调度，HPA 等。
+     系统度量的调度器和水平 pod 自动调节
+     https://github.com/kubernetes/community/blob/master/contributors/design-proposals/instrumentation/monitoring_architecture.md
+*** 部署
+    #+BEGIN_SRC yaml
+      apiVersion: rbac.authorization.k8s.io/v1beta1
+      kind: ClusterRoleBinding
+      metadata:
+        name: metrics-server:system:auth-delegator
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: ClusterRole
+        name: system:auth-delegator
+      subjects:
+      - kind: ServiceAccount
+        name: metrics-server
+        namespace: kube-system
+      ---
+      apiVersion: rbac.authorization.k8s.io/v1beta1
+      kind: RoleBinding
+      metadata:
+        name: metrics-server-auth-reader
+        namespace: kube-system
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: Role
+        name: extension-apiserver-authentication-reader
+      subjects:
+      - kind: ServiceAccount
+        name: metrics-server
+        namespace: kube-system
+      ---
+      apiVersion: apiregistration.k8s.io/v1beta1
+      kind: APIService
+      metadata:
+        name: v1beta1.metrics.k8s.io
+      spec:
+        service:
+          name: metrics-server
+          namespace: kube-system
+        group: metrics.k8s.io
+        version: v1beta1
+        insecureSkipTLSVerify: true
+        groupPriorityMinimum: 100
+        versionPriority: 100
+      ---
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: metrics-server
+        namespace: kube-system
+      ---
+      apiVersion: extensions/v1beta1
+      kind: Deployment
+      metadata:
+        name: metrics-server
+        namespace: kube-system
+        labels:
+          k8s-app: metrics-server
+      spec:
+        selector:
+          matchLabels:
+            k8s-app: metrics-server
+        template:
+          metadata:
+            name: metrics-server
+            labels:
+              k8s-app: metrics-server
+          spec:
+            serviceAccountName: metrics-server
+            containers:
+            - name: metrics-server
+              image: 192.168.1.55/tenx_containers/metrics-server-amd64:v0.2.0
+              imagePullPolicy: Always
+              command:
+              - /metrics-server
+              - --source=kubernetes.summary_api:''
+      ---
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: metrics-server
+        namespace: kube-system
+        labels:
+          kubernetes.io/name: "Metrics-server"
+      spec:
+        selector:
+          k8s-app: metrics-server
+        ports:
+        - port: 443
+          protocol: TCP
+          targetPort: 443
+      ---
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRole
+      metadata:
+        name: system:metrics-server
+      rules:
+      - apiGroups:
+        - ""
+        resources:
+        - pods
+        - nodes
+        - namespaces
+        verbs:
+        - get
+        - list
+        - watch
+      - apiGroups:
+        - "extensions"
+        resources:
+        - deployments
+        verbs:
+        - get
+        - list
+        - watch
+      ---
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRoleBinding
+      metadata:
+        name: system:metrics-server
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: ClusterRole
+        name: system:metrics-server
+      subjects:
+      - kind: ServiceAccount
+        name: metrics-server
+        namespace: kube-system
+    #+END_SRC
+    可以使用 kubectl get --raw 来测试我们新的附加 API 服务器。
+
+    #+BEGIN_SRC sh
+      [root@k8s1.9-master-1.21 deploy]$ kubectl get --raw "/apis/metrics.k8s.io/v1beta1/nodes"
+      {"kind":"NodeMetricsList","apiVersion":"metrics.k8s.io/v1beta1","metadata":{"selfLink":"/apis/metrics.k8s.io/v1beta1/nodes"},"items":[{"metadata":{"name":"k8s1.9-node-1.22","selfLink":"/apis/metrics.k8s.io/v1beta1/nodes/k8s1.9-node-1.22","creationTimestamp":"2018-01-18T07:34:04Z"},"timestamp":"2018-01-18T07:33:00Z","window":"1m0s","usage":{"cpu":"110m","memory":"1207440Ki"}}]}
+    #+END_SRC
+
+** kube-state-metrics
+     kube-state-metrics 是一个简单的服务，它监听 Kubernetes API 服务器并生成关于对
+     象状态的度量(如 CronJob, DaemonSet,ReplicaSet)。目前可以抓取的对象列表：
+     https://github.com/kubernetes/kube-state-metrics/tree/master/Documentation
+*** 部署
+    #+BEGIN_SRC yaml
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRoleBinding
+      metadata:
+        name: kube-state-metrics
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: ClusterRole
+        name: kube-state-metrics
+      subjects:
+      - kind: ServiceAccount
+        name: kube-state-metrics
+        namespace: kube-system
+      ---
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRole
+      metadata:
+        name: kube-state-metrics
+      rules:
+      - apiGroups: [""]
+        resources:
+        - nodes
+        - pods
+        - services
+        - resourcequotas
+        - replicationcontrollers
+        - limitranges
+        - persistentvolumeclaims
+        - persistentvolumes
+        - namespaces
+        - endpoints
+        verbs: ["list", "watch"]
+      - apiGroups: ["extensions"]
+        resources:
+        - daemonsets
+        - deployments
+        - replicasets
+        verbs: ["list", "watch"]
+      - apiGroups: ["apps"]
+        resources:
+        - statefulsets
+        verbs: ["list", "watch"]
+      - apiGroups: ["batch"]
+        resources:
+        - cronjobs
+        - jobs
+        verbs: ["list", "watch"]
+      - apiGroups: ["autoscaling"]
+        resources:
+        - horizontalpodautoscalers
+        verbs: ["list", "watch"]
+      ---
+      apiVersion: apps/v1beta2
+      # Kubernetes versions after 1.9.0 should use apps/v1
+      kind: Deployment
+      metadata:
+        name: kube-state-metrics
+        namespace: kube-system
+      spec:
+        selector:
+          matchLabels:
+            k8s-app: kube-state-metrics
+        replicas: 1
+        template:
+          metadata:
+            labels:
+              k8s-app: kube-state-metrics
+          spec:
+            serviceAccountName: kube-state-metrics
+            containers:
+            - name: kube-state-metrics
+              image: 192.168.1.55/tenx_containers/kube-state-metrics:v1.2.0
+              ports:
+              - name: http-metrics
+                containerPort: 8080
+              readinessProbe:
+                httpGet:
+                  path: /healthz
+                  port: 8080
+                initialDelaySeconds: 5
+                timeoutSeconds: 5
+            - name: addon-resizer
+              image: 192.168.1.55/tenx_containers/addon-resizer:1.0
+              resources:
+                limits:
+                  cpu: 100m
+                  memory: 30Mi
+                requests:
+                  cpu: 100m
+                  memory: 30Mi
+              env:
+                - name: MY_POD_NAME
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.name
+                - name: MY_POD_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+              command:
+                - /pod_nanny
+                - --container=kube-state-metrics
+                - --cpu=100m
+                - --extra-cpu=1m
+                - --memory=100Mi
+                - --extra-memory=2Mi
+                - --threshold=5
+                - --deployment=kube-state-metrics
+      ---
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: RoleBinding
+      metadata:
+        name: kube-state-metrics
+        namespace: kube-system
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: Role
+        name: kube-state-metrics-resizer
+      subjects:
+      - kind: ServiceAccount
+        name: kube-state-metrics
+        namespace: kube-system
+      ---
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: Role
+      metadata:
+        namespace: kube-system
+        name: kube-state-metrics-resizer
+      rules:
+      - apiGroups: [""]
+        resources:
+        - pods
+        verbs: ["get"]
+      - apiGroups: ["extensions"]
+        resources:
+        - deployments
+        resourceNames: ["kube-state-metrics"]
+        verbs: ["get", "update"]
+      ---
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: kube-state-metrics
+        namespace: kube-system
+      ---
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: kube-state-metrics
+        namespace: kube-system
+        labels:
+          k8s-app: kube-state-metrics
+        annotations:
+          prometheus.io/scrape: 'true'
+      spec:
+        ports:
+        - name: http-metrics
+          port: 8080
+          targetPort: http-metrics
+          protocol: TCP
+        selector:
+          k8s-app: kube-state-metrics
+    #+END_SRC
+    部署后，则可以在 promethus 查询页面查询到相关的 metrics，目前支持的 metrics 文档
+    请查看[[https://github.com/kubernetes/kube-state-metrics/tree/master/Documentation][官方文档]]
+
+** custom-metrics
+     目前 custom-metrics 没有一个官方的部署方式，目前测试使用的是 coreos 出的
+     prometheus-opertator 部署的 prometheus(里面自定义了 prometheus 的抓取服务的配
+     置)scrape 数据，然后通过 prometheus-adapter 将数据发送的 apiserver 中，以提供 hpa
+     controller 获取相应的 metrics 信息，实现自定义扩容。
+*** 部署
+**** prometheus 部署
+       目前测试使用的 core 提供的 prometheus-operator 部署的 prometheus 抓取自定义的
+     metrics, prometheus-operator 在创建 prometheus 示例时，会创建三个 CRD
+     serviceMonitors，prometheuses, alertmanagers。
+***** serviceMonitor
+      可以根据 label selections 自动生成 prometheus 的监控配置文件
+     #+BEGIN_SRC yaml
+       apiVersion: rbac.authorization.k8s.io/v1
+       kind: ClusterRole
+       metadata:
+         name: prometheus-operator
+       rules:
+       - apiGroups:
+         - extensions
+         resources:
+         - thirdpartyresources
+         verbs:
+         - create
+       - apiGroups:
+         - apiextensions.k8s.io
+         resources:
+         - customresourcedefinitions
+         verbs:
+         - "*"
+       - apiGroups:
+         - monitoring.coreos.com
+         resources:
+         - alertmanagers
+         - prometheuses
+         - servicemonitors
+         verbs:
+         - "*"
+       - apiGroups:
+         - apps
+         resources:
+         - statefulsets
+         verbs: ["*"]
+       - apiGroups: [""]
+         resources:
+         - configmaps
+         - secrets
+         verbs: ["*"]
+       - apiGroups: [""]
+         resources:
+         - pods
+         verbs: ["list", "delete"]
+       - apiGroups: [""]
+         resources:
+         - services
+         - endpoints
+         verbs: ["get", "create", "update"]
+       - apiGroups: [""]
+         resources:
+         - nodes
+         verbs: ["list", "watch"]
+       - apiGroups: [""]
+         resources:
+         - namespaces
+         verbs: ["list"]
+       ---
+       apiVersion: v1
+       kind: ServiceAccount
+       metadata:
+         name: prometheus-operator
+       ---
+       apiVersion: rbac.authorization.k8s.io/v1
+       kind: ClusterRoleBinding
+       metadata:
+         name: prometheus-operator
+       roleRef:
+         apiGroup: rbac.authorization.k8s.io
+         kind: ClusterRole
+         name: prometheus-operator
+       subjects:
+       - kind: ServiceAccount
+         name: prometheus-operator
+         namespace: default
+       ---
+       apiVersion: apps/v1beta2
+       kind: Deployment
+       metadata:
+         name: prometheus-operator
+         labels:
+           operator: prometheus
+       spec:
+         replicas: 1
+         selector:
+           matchLabels:
+             operator: prometheus
+         template:
+           metadata:
+             labels:
+               operator: prometheus
+           spec:
+             serviceAccountName: prometheus-operator
+             containers:
+              - name: prometheus-operator
+                image: 192.168.1.55/tenx_containers/prometheus-operator:v0.13.0
+                resources:
+                  requests:
+                    cpu: 100m
+                    memory: 50Mi
+                  limits:
+                    cpu: 200m
+                    memory: 100Mi
+     #+END_SRC
+***** 部署 prometheus 示例
+
+      #+BEGIN_SRC yaml
+               ---
+               apiVersion: rbac.authorization.k8s.io/v1
+               kind: ClusterRole
+               metadata:
+                 name: prometheus
+               rules:
+               - apiGroups:
+                 - ""
+                 resources:
+                 - nodes
+                 - services
+                 - endpoints
+                 - pods
+                 verbs:
+                 - get
+                 - list
+                 - watch
+               ---
+               apiVersion: v1
+               kind: ServiceAccount
+               metadata:
+                 name: prometheus
+               ---
+               apiVersion: rbac.authorization.k8s.io/v1
+               kind: ClusterRoleBinding
+               metadata:
+                 name: prometheus
+               roleRef:
+                 apiGroup: rbac.authorization.k8s.io
+                 kind: ClusterRole
+                 name: prometheus
+               subjects:
+               - kind: ServiceAccount
+                 name: prometheus
+                 namespace: default
+               ---
+               apiVersion: monitoring.coreos.com/v1
+               kind: Prometheus
+               metadata:
+                 name: sample-metrics-prom
+                 labels:
+                   app: sample-metrics-prom
+                   prometheus: sample-metrics-prom
+               spec:
+                 replicas: 1
+                 baseImage: 192.168.1.55/tenx_containers/prometheus
+                 version: v2.0.0
+                 serviceAccountName: prometheus
+                 serviceMonitorSelector:
+                   matchLabels:
+                     service-monitor: sample-metrics-app
+                 resources:
+                   requests:
+                     memory: 300Mi
+                 retention: 7d
+                 storage:
+                   volumeClaimTemplate:
+                     spec:
+                       storageClassName: rook-block
+                       resources:
+                         requests:
+                           storage: 3Gi
+               ---
+               apiVersion: v1
+               kind: Service
+               metadata:
+                 name: sample-metrics-prom
+                 labels:
+                   app: sample-metrics-prom
+                   prometheus: sample-metrics-prom
+               spec:
+                 type: NodePort
+                 ports:
+                 - name: web
+                   nodePort: 30999
+                   port: 9090
+                   targetPort: web
+                 selector:
+                   prometheus: sample-metrics-prom
+      #+END_SRC
+**** 部署 prometheus adapter
+
+     #+BEGIN_SRC yaml
+       kind: Namespace
+       apiVersion: v1
+       metadata:
+         name: custom-metrics
+       ---
+       kind: ServiceAccount
+       apiVersion: v1
+       metadata:
+         name: custom-metrics-apiserver
+         namespace: custom-metrics
+       ---
+       apiVersion: rbac.authorization.k8s.io/v1
+       kind: ClusterRoleBinding
+       metadata:
+         name: custom-metrics:system:auth-delegator
+       roleRef:
+         apiGroup: rbac.authorization.k8s.io
+         kind: ClusterRole
+         name: system:auth-delegator
+       subjects:
+       - kind: ServiceAccount
+         name: custom-metrics-apiserver
+         namespace: custom-metrics
+       ---
+       apiVersion: rbac.authorization.k8s.io/v1
+       kind: RoleBinding
+       metadata:
+         name: custom-metrics-auth-reader
+         namespace: kube-system
+       roleRef:
+         apiGroup: rbac.authorization.k8s.io
+         kind: Role
+         name: extension-apiserver-authentication-reader
+       subjects:
+       - kind: ServiceAccount
+         name: custom-metrics-apiserver
+         namespace: custom-metrics
+       ---
+       apiVersion: rbac.authorization.k8s.io/v1
+       kind: ClusterRole
+       metadata:
+         name: custom-metrics-resource-reader
+       rules:
+       - apiGroups:
+         - ""
+         resources:
+         - namespaces
+         - pods
+         - services
+         verbs:
+         - get
+         - list
+       ---
+       apiVersion: rbac.authorization.k8s.io/v1
+       kind: ClusterRoleBinding
+       metadata:
+         name: custom-metrics-apiserver-resource-reader
+       roleRef:
+         apiGroup: rbac.authorization.k8s.io
+         kind: ClusterRole
+         name: custom-metrics-resource-reader
+       subjects:
+       - kind: ServiceAccount
+         name: custom-metrics-apiserver
+         namespace: custom-metrics
+       ---
+       apiVersion: rbac.authorization.k8s.io/v1
+       kind: ClusterRole
+       metadata:
+         name: custom-metrics-getter
+       rules:
+       - apiGroups:
+         - custom.metrics.k8s.io
+         resources:
+         - "*"
+         verbs:
+         - "*"
+       ---
+       apiVersion: rbac.authorization.k8s.io/v1
+       kind: ClusterRoleBinding
+       metadata:
+         name: hpa-custom-metrics-getter
+       roleRef:
+         apiGroup: rbac.authorization.k8s.io
+         kind: ClusterRole
+         name: custom-metrics-getter
+       subjects:
+       - kind: ServiceAccount
+         name: horizontal-pod-autoscaler
+         namespace: kube-system
+       ---
+       apiVersion: apps/v1beta2
+       kind: Deployment
+       metadata:
+         name: custom-metrics-apiserver
+         namespace: custom-metrics
+         labels:
+           app: custom-metrics-apiserver
+       spec:
+         replicas: 1
+         selector:
+           matchLabels:
+             app: custom-metrics-apiserver
+         template:
+           metadata:
+             labels:
+               app: custom-metrics-apiserver
+           spec:
+             tolerations:
+             - key: beta.kubernetes.io/arch
+               value: arm
+               effect: NoSchedule
+             - key: beta.kubernetes.io/arch
+               value: arm64
+               effect: NoSchedule
+             serviceAccountName: custom-metrics-apiserver
+             containers:
+             - name: custom-metrics-server
+               image: 192.168.1.55/tenx_containers/k8s-prometheus-adapter:v0.2.0-beta.0
+               args:
+               - --prometheus-url=http://sample-metrics-prom.default.svc:9090
+               - --metrics-relist-interval=30s
+               - --rate-interval=60s
+               - --v=10
+               - --logtostderr=true
+               ports:
+               - containerPort: 443
+               securityContext:
+                 runAsUser: 0
+       ---
+       apiVersion: v1
+       kind: Service
+       metadata:
+         name: api
+         namespace: custom-metrics
+       spec:
+         ports:
+         - port: 443
+           targetPort: 443
+         selector:
+           app: custom-metrics-apiserver
+       ---
+       apiVersion: apiregistration.k8s.io/v1beta1
+       kind: APIService
+       metadata:
+         name: v1beta1.custom.metrics.k8s.io
+       spec:
+         insecureSkipTLSVerify: true
+         group: custom.metrics.k8s.io
+         groupPriorityMinimum: 1000
+         versionPriority: 5
+         service:
+           name: api
+           namespace: custom-metrics
+         version: v1beta1
+       ---
+       apiVersion: rbac.authorization.k8s.io/v1
+       kind: ClusterRole
+       metadata:
+         name: custom-metrics-server-resources
+       rules:
+       - apiGroups:
+         - custom-metrics.metrics.k8s.io
+         resources: ["*"]
+         verbs: ["*"]
+       ---
+       apiVersion: rbac.authorization.k8s.io/v1
+       kind: ClusterRoleBinding
+       metadata:
+         name: hpa-controller-custom-metrics
+       roleRef:
+         apiGroup: rbac.authorization.k8s.io
+         kind: ClusterRole
+         name: custom-metrics-server-resources
+       subjects:
+       - kind: ServiceAccount
+         name: horizontal-pod-autoscaler
+         namespace: kube-system
+     #+END_SRC
+**** 测试示例
+
+     #+BEGIN_SRC yaml
+       apiVersion: apps/v1beta2
+       kind: Deployment
+       metadata:
+         labels:
+           app: sample-metrics-app
+         name: sample-metrics-app
+       spec:
+         replicas: 2
+         selector:
+           matchLabels:
+             app: sample-metrics-app
+         template:
+           metadata:
+             labels:
+               app: sample-metrics-app
+           spec:
+             tolerations:
+             - key: beta.kubernetes.io/arch
+               value: arm
+               effect: NoSchedule
+             - key: beta.kubernetes.io/arch
+               value: arm64
+               effect: NoSchedule
+             - key: node.alpha.kubernetes.io/unreachable
+               operator: Exists
+               effect: NoExecute
+               tolerationSeconds: 0
+             - key: node.alpha.kubernetes.io/notReady
+               operator: Exists
+               effect: NoExecute
+               tolerationSeconds: 0
+             containers:
+             - image: 192.168.1.55/tenx_containers/autoscale-demo:v0.1.2
+               name: sample-metrics-app
+               ports:
+               - name: web
+                 containerPort: 8080
+               readinessProbe:
+                 httpGet:
+                   path: /
+                   port: 8080
+                 initialDelaySeconds: 3
+                 periodSeconds: 5
+               livenessProbe:
+                 httpGet:
+                   path: /
+                   port: 8080
+                 initialDelaySeconds: 3
+                 periodSeconds: 5
+       ---
+       apiVersion: v1
+       kind: Service
+       metadata:
+         name: sample-metrics-app
+         labels:
+           app: sample-metrics-app
+       spec:
+         ports:
+         - name: web
+           port: 80
+           targetPort: 8080
+         selector:
+           app: sample-metrics-app
+       ---
+       apiVersion: monitoring.coreos.com/v1
+       kind: ServiceMonitor
+       metadata:
+         name: sample-metrics-app
+         labels:
+           service-monitor: sample-metrics-app
+       spec:
+         selector:
+           matchLabels:
+             app: sample-metrics-app
+         endpoints:
+         - port: web
+       ---
+       kind: HorizontalPodAutoscaler
+       apiVersion: autoscaling/v2beta1
+       metadata:
+         name: sample-metrics-app-hpa
+       spec:
+         scaleTargetRef:
+           kind: Deployment
+           name: sample-metrics-app
+         minReplicas: 2
+         maxReplicas: 10
+         metrics:
+         - type: Object
+           object:
+             target:
+               kind: Service
+               name: sample-metrics-app
+             metricName: http_requests
+             targetValue: 100
+       ---
+       apiVersion: extensions/v1beta1
+       kind: Ingress
+       metadata:
+         name: sample-metrics-app
+         namespace: default
+         annotations:
+           traefik.frontend.rule.type: PathPrefixStrip
+       spec:
+         rules:
+         - http:
+             paths:
+             - path: /sample-app
+               backend:
+                 serviceName: sample-metrics-app
+                 servicePort: 80
+     #+END_SRC

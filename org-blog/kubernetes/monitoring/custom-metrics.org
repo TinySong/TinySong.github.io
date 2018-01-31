@@ -1,0 +1,91 @@
+---
+categories: ["kubernetes", "autoscale"]
+tags: ["kubernetes"]
+type: "post"
+title: ""
+subtitle: "Custom Metrics"
+date: "2017-12-07T15:46:13+08:00"
+draft: false
+description: ""
+---
+
+k8s 1.8 开始支持自定义 Metric,给需要通过探测多维度的 pod 健康情况，实现 ~HPA~ 的
+场景 带来了福音.k8s 之前的版本 HPA 只支持 CPU，网上也有针对 memory 的 HPA 解决方案，见
+ 这篇博客主要从如何实现自定义的 metric 以及如何配置，HPA 如何使用
+~custom Metric~ 入手，HPA 和 customer Metric 概念请查询官方文档
+
+
+* 环境
+  1. kuberntes 版本：kubernetes 1.8.3
+  2. linux 系统版本：centos 7.4
+
+* 配置
+** 开启 aggregation layer
+*** api-server
+  To use custom metrics with your Horizontal Pod Autoscaler, you must set the
+  necessary configurations when deploying your cluster:
+  1. [[https://kubernetes.io/docs/tasks/access-kubernetes-api/configure-aggregation-layer/][enable the API aggregation layer]]  if you have not already done so.
+   #+BEGIN_SRC sh
+    --requestheader-client-ca-file=<path to aggregator CA cert>
+    --requestheader-allowed-names=aggregator
+    --requestheader-extra-headers-prefix=X-Remote-Extra-
+    --requestheader-group-headers=X-Remote-Group
+    --requestheader-username-headers=X-Remote-User
+    --proxy-client-cert-file=<path to aggregator proxy cert>
+    --proxy-client-key-file=<path to aggregator proxy key>
+   #+END_SRC
+   在 k8s1.9 安装时，以上参数已自动安装，需要修改 requestheader-allowed-names 参数,
+     默认值为 front-proxy-client, 修改如下：
+     #+BEGIN_SRC sh
+       --requestheader-allowed-names=front-proxy-client,aggregator
+     #+END_SRC
+*** kube-controller
+   需要添加参数
+  #+BEGIN_SRC sh
+    --horizontal-pod-autoscaler-use-rest-clients=true     #
+    --master=127.0.0.1:8080   #These flags specify the location of the API aggregation layer, allowing the controller manager to communicate to the API server
+  #+END_SRC
+
+** 部署 prometheus-operator
+
+  2. 创建一个扩展 apiserver (如 prometheus-adapter)
+ 	   https://kubernetes.io/docs/tasks/access-kubernetes-api/setup-extension-api-server/
+
+** metrics server
+   1. Metric server collects metrics from the Summary API, exposed by [[https://kubernetes.io/docs/reference/generated/kubelet/][Kubelet]] on each node.
+   2. Metrics Server registered in the main API server through Kubernetes [[https://kubernetes.io/docs/concepts/api-extension/apiserver-aggregation/][aggregation]], which was introduced in Kubernetes 1.7.
+* kubernete1.9 后的变化
+  1. ~--enable-custom-metrics=true~ deprecated
+  2.
+* 存在的问题
+  1. cAdvisor should retrieve application metrics using container's network
+     namespace,目前只支持将服务端口暴露在节点上
+ 	https://github.com/google/cadvisor/issues/1212
+* 扩展阅读
+  [1] [[https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#support-for-custom-metrics][Horizontal Pod Autoscaling]]
+  [2] [[http://blog.csdn.net/liyingke112/article/details/77101673][kubernetes 资源对象--Horizontal Pod Autoscaling（HPA）]]
+  [3] [[https://medium.com/@marko.luksa/kubernetes-autoscaling-based-on-custom-metrics-without-using-a-host-port-b783ed6241ac][Kubernetes autoscaling based on custom metrics without using a host port]]
+  http://guoshimin.github.io/2016/06/03/custom-metrics.html
+  [4] "community/monitoring_architecture.md at master · kubernetes/community"
+ 	https://github.com/kubernetes/community/blob/master/contributors/design-proposals/instrumentation/monitoring_architecture.md
+
+* 注意事项
+  启动的示例需要加 prometheus.io/scrape: "true",否则 prometheus 不会抓去数据
+  通过调用/api/v1/series 接口获得 prometheus 的度量指标列表
+  https://prometheus.io/docs/prometheus/latest/querying/api/#querying-label-values
+  ,k8s-prometheus-adapter 通过查询参数
+
+  #+BEGIN_SRC sh
+    match[]={__name__=~"^container_.*",container_name!="POD",namespace!="",pod_name!=""}&match[]={namespace!="",__name__!~"^container_.*"}&start=1515653055.943
+  #+END_SRC
+  获取 series 列表，通过查询条件，获得 cadvisor container metrics(https://github.com/DirectXMan12/k8s-prometheus-adapter/blob/master/docs/format.mdhttps://github.com/DirectXMan12/k8s-prometheus-adapter/blob/master/docs/format.md#metrics-format-and-presentation
+)
+
+
+* 问题
+  1. 当设置 no scrape 后，cadvisor 未抓区到数据
+  2. 设置后，prometheus adapter 抓取到的数据不正确
+
+  3. prometheus 2.0 的配置文件发生了变化，修改后，会获取 ingress 的信息，但提示没有
+     权限，待解决,目前的处理方式是，想将 ingress 的 scrape job 去掉,ingress 介绍：
+     https://kubernetes.io/docs/concepts/services-networking/ingress/
