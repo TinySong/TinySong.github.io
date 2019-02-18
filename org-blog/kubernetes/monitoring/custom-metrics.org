@@ -78,7 +78,9 @@ k8s 1.8 开始支持自定义 Metric,给需要通过探测多维度的 pod 健�
   #+BEGIN_SRC sh
     match[]={__name__=~"^container_.*",container_name!="POD",namespace!="",pod_name!=""}&match[]={namespace!="",__name__!~"^container_.*"}&start=1515653055.943
   #+END_SRC
-  获取 series 列表，通过查询条件，获得 cadvisor container metrics(https://github.com/DirectXMan12/k8s-prometheus-adapter/blob/master/docs/format.mdhttps://github.com/DirectXMan12/k8s-prometheus-adapter/blob/master/docs/format.md#metrics-format-and-presentation
+  获取 series 列表，通过查询条件，获得 cadvisor container
+metrics(https://github.com/DirectXMan12/k8s-prometheus-adapter/blob/master/docs/format.md
+https://github.com/DirectXMan12/k8s-prometheus-adapter/blob/master/docs/format.md#metrics-format-and-presentation
 )
 
 

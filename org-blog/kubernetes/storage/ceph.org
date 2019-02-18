@@ -56,12 +56,12 @@ description: ""
      time.cbdtelecom.cn
 **** 创建部署 ceph 的用户
       见[[http://docs.ceph.org.cn/start/quick-start-preflight/][ceph 官方文档]]
-      在 *各个* 节点上通过以下命令创建一个 tenxcloud 用户，
+      在 *各个* 节点上通过以下命令创建一个 cephtest 用户，
       #+BEGIN_SRC sh
-        useradd -d /home/tenxcloud -m tenxcloud
-        passwd tenxcloud
-        echo "tenxcloud ALL = (root) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/tenxcloud
-        chmod 0440 /etc/sudoers.d/tenxcloud
+        useradd -d /home/cephtest -m cephtest
+        passwd cephtest
+        echo "cephtest ALL = (root) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/cephtest
+        chmod 0440 /etc/sudoers.d/cephtest
       #+END_SRC
 ** 安装过程
 *** ceph 集群
@@ -87,7 +87,7 @@ description: ""
      #+END_SRC
       Ceph Monitors 之间默认使用 6789 端口通信，OSD 之间默认用 6800:7300 范围内
       的端口通信，多个集群应当保证端口不冲突
- **** ceph 软件包安装
+**** ceph 软件包安装
       通过以下命令，安装 ceph 软件包到三个节点上
        #+BEGIN_SRC sh
          ceph-deploy install --release luminous ceph-master-11 ceph-slave-15 ceph-slave-16
@@ -120,7 +120,6 @@ description: ""
           ceph-deploy admin ceph-master-11 ceph-slave-15 ceph-slave-16
         #+END_SRC
 
-
 **** 添加 osd
       OSD node 是真正存储数据的节点，我们需要为 ceph-osd 提供独立存储空间，一般是一
       个独立的 disk。但我们环境不具备这个条件，于是在本地盘上创建了个目录，提供给
@@ -140,7 +139,6 @@ description: ""
       #+BEGIN_SRC sh
         ceph-deploy osd create ceph-slave-16:/ceph-data/osd1 ceph-slave-15:/ceph-data/osd0 # (create equal prepare and active)
       #+END_SRC
-
 
 **** 检查 ceph 状态
      #+BEGIN_SRC sh
@@ -201,6 +199,18 @@ description: ""
     + 默认的消息处理从 simple 变成了 async 了（ms_type = async+posix）
     + 默认的后端存储从 filestore 变成了 bluestore 了
 
+** ceph-rest-api
+*** service start
+    ceph-rest-api -c /etc/ceph/ceph.conf -n client.admin --cluster ceph
+*** restapi 操作
+    1. 查看所有 restapi
+       http://192.168.0.4:5000/api/v0.1
+    2.查看 ceph 用户
+    radosgw-admin user info --uid=johndoe
+
+**** 例子
+     1. 获取 api 用户系统
+     curl http://0.0.0.0:5000/api/v0.1/auth/get?entity=client.admin
 ** 引用
    1. 使用 Ceph RBD 为 Kubernetes 集群提供存储卷 | Tony Bai
  	 http://tonybai.com/2016/11/07/integrate-kubernetes-with-ceph-rbd/

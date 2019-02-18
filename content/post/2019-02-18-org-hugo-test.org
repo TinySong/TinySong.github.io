@@ -1,0 +1,8 @@
+#+DATE: 2019-02-18T16:24:22+08:00
+#+TITLE: org-hugo-test
+#+URL: /org-hugo-test/
+#+BANNER: 
+#+CATEGORIES: ['hugo']
+#+TAGS: hugo test
+
+org-hogo-test

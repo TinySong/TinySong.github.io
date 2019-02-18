@@ -1,63 +1,110 @@
 baseurl: "https://tinysong.github.io/"
-DefaultContentLanguage: en
-title: "Michael song"
-theme: "beautifulhugo"
+languageCode: "en-us"
+title: "Rx Blog"
+theme: "hugo-theme-cleanwhite"
 metaDataFormat: yaml
-pygmentsUseClasses: true
-pygmentsCodeFences: true
+# pygmentsUseClasses: true
+# pygmentsCodeFences: true
 hasCJKLanguage: true
-disqusShortname: "michael-song"
+
+# Enable comments by entering your Disqus shortname
+disqusShortname: "song"
+googleAnalytics: ""
+# Pagination
+paginate:  5
+
+outputs:
+  home:
+    - HTML
+    - RSS
+    - Algolia
 author:
-  name: "Michael song"
+  name: "song"
   github: tinysong
   twitter: tiny_xsong
   website: "tinysong.github.io"
 
 params:
-  Subtitle: "Thinking and Conclusion about Emacs and Cloud Native"
+  header_image: "img/home-bg-jeep.jpg"
+  SEOTitle:  "宋荣祥的博客 | song Blog"
+  description : "Thinking and Conclusion about Emacs and Cloud Native"
+  slogan: "Do a little more of what you want to do every day, until your idea becomes what's real."
   logo: "img/avatar-icon.png"
-  favicon: img/favicon.ico
+  image_404: "img/404-bg.jpg"
+  favicon: "img/favicon.ico"
+  title_404: "你来到了没有知识的荒原 :("
   dateFormat: 'January 2, 2006'
   website: "tinysong.github.io"
-  # Tagline: "一个程序员的思考与总结"
-  # Description: "如果你没有感觉到时间不够用时，你多半正在虚度光阴。"
-  # Keywords: "独立博客,程序员,思考,读书笔记,技术分享"
+
+  # Sidebar settings
+  sidebar_about_description: "Software Developer"
+  # leancloud storage for page view counter
+  page_view_conter: false
+  leancloud_app_id: ""
+  leancloud_app_key: ""
+
+  # TODO readme
+  algolia_search: true
+  algolia_appId: ''
+  algolia_indexName: ''
+  algolia_apiKey: ''
+
+  sidebar_avatar: "img/avatar.jpeg"      # use absolute URL, seeing it's used in both `/` and `/about/`
+  featured_tags: true
+  featured_condition_size: 0
+  # We need a proxy to access Disqus api in China
+  # Follow https://github.com/zhaohuabing/disqus-php-api to set up your own disqus proxy
+  disqus_proxy: ""
+  disqus_site: ""
+
+  #Enable wechat pay & alipay to allow readers send reward money if they like the articles
+  reward: true
+  # reward_guide = "如果这篇文章对你有用,请随意打赏"
+  friends: true
+  bookmarks: false
+  about_me: true
+
+  social:
+    rss: true
+    email: tinysong1226@gmail.com
+    # linkedin: 'https://www.linkedin.com/in/yourlinkedinid'
+    stackoverflow: 'https://stackoverflow.com/users/yourstackoverflowid'
+    github: 'https://github.com/tinysong'
+    wechat: img/wechat_qrcode.jpg
+  bookmarks:
+    - title: Martin Fowler
+      href: 'https://martinfowler.com'
+    - title: ServiceMesher
+      href: 'http://www.servicemesher.com'
+    - title: Pxhere
+      href: 'https://pxhere.com'
+    - title: unsplash
+      href: 'https://unsplash.com'
+
+  addtional_menus:
+    - title: BOOKS
+      href: /top/books/
+    - title: ABOUT
+      href: /top/about/
+  algolia:
+    vars:
+      - title
+      - summary
+      - date
+      - publishdate
+      - expirydate
+      - permalink
+    params:
+      - categories
+      - tags
+
   commit: true
   rss: true
   comments: true
   useChroma: true
-  disable404: false
-  # Pagination
-  paginate:  10
-menu:
-  main:
-    - Name: "Blog"
-      Pre: "<i class='fa fa-heart'></i>"
-      Weight: 3
-      Identifier: "post"
-      URL: "/post/"
-    - Name: "BOOK"
-      Pre: "<i class='fa fa-heart'></i>"
-      Weight: 4
-      Identifier: "book"
-      URL: "/book/"
-    - Name: "KUBERNETES"
-      Pre: "<i class='fa fa-heart'></i>"
-      Weight: 4
-      Identifier: "kubernetes"
-      URL: "/kubernetes/"
-    - Name: "EMACS"
-      Pre: "<i class='fa fa-heart'></i>"
-      Weight: 4
-      Identifier: "emacs"
-      URL: "/emacs/"
-    # - Name: "PROJECT"
-    #   Pre: "<i class='fa fa-heart'></i>"
-    #   Weight: 4
-    #   Identifier: "project"
-    #   URL: "/project/"
-    - Name: "ABOUT"
-      Pre: "<i class='fa fa-road'></i>"
-      Identifier: "about"
-      Weight: 5
-      URL: "/about/"
+outputFormats:
+  Algolia:
+    baseName: algolia
+    isPlainText: true
+    mediaType: application/json
+    notAlternative: true
