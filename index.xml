@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Rx Blog</title>
+    <link>https://tinysong.github.io/</link>
+    <description>Recent content on Rx Blog</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Mon, 18 Feb 2019 16:24:22 +0800</lastBuildDate>
+    
+	<atom:link href="https://tinysong.github.io/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>org-hugo-test</title>
+      <link>https://tinysong.github.io/org-hugo-test/</link>
+      <pubDate>Mon, 18 Feb 2019 16:24:22 +0800</pubDate>
+      
+      <guid>https://tinysong.github.io/org-hugo-test/</guid>
+      <description>org-hogo-test</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>https://tinysong.github.io/search/placeholder/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://tinysong.github.io/search/placeholder/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>https://tinysong.github.io/top/about/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://tinysong.github.io/top/about/</guid>
+      <description>Huabing Zhao is an ICT veteran with a passion for open source. He has a solid experience in the telecommunication and information technology industry for more than 17 years.
+Throughout his career, he has built a number of large-scale, cross-country OSS/BSS platforms/systems and operation tools, most of them are still running in productions.
+He loves open source and has been contributing to a variety of open source projects, including Istio(Service Mesh https://istio.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>https://tinysong.github.io/top/books/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>https://tinysong.github.io/top/books/</guid>
+      <description>Machine learning学习笔记 Coursera 在线课程 Machine learning 笔记 讲师: 吴恩达(Andrew Ng)  课程地址：https://www.coursera.org/learn/machine-learning</description>
+    </item>
+    
+  </channel>
+</rss>
