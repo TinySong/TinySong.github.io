@@ -25,7 +25,7 @@ author:
   website: "tinysong.github.io"
 
 params:
-  header_image: "img/home-bg-jeep.jpg"
+  header_image: "img/home-bg-sun.jpg"
   SEOTitle:  "宋荣祥的博客 | song Blog"
   description : "Thinking and Conclusion about Emacs and Cloud Native"
   slogan: "Do a little more of what you want to do every day, until your idea becomes what's real."
